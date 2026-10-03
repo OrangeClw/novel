@@ -2,7 +2,9 @@ package io.github.xxyopen.novel.dto.req;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.github.xxyopen.novel.core.common.req.PageReqDto;
+import io.github.xxyopen.novel.core.constant.DatabaseConsts;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -72,7 +74,11 @@ public class BookSearchReqDto extends PageReqDto {
 
     /**
      * 排序字段
+     * 会直接拼接到 SQL 的 order by 子句中，必须限制在白名单内，防止 SQL 注入
      */
     @Parameter(description = "排序字段")
+    @Pattern(regexp = "^(" + DatabaseConsts.BookTable.COLUMN_LAST_CHAPTER_UPDATE_TIME
+        + "|" + DatabaseConsts.BookTable.COLUMN_WORD_COUNT
+        + "|" + DatabaseConsts.BookTable.COLUMN_VISIT_COUNT + ")$", message = "排序字段不合法！")
     private String sort;
 }

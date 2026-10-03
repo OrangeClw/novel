@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -143,22 +142,15 @@ public class BookServiceImpl implements BookService {
     public RestResp<List<BookInfoRespDto>> listRecBooks(Long bookId)
         throws NoSuchAlgorithmException {
         Long categoryId = bookInfoCacheManager.getBookInfo(bookId).getCategoryId();
-        List<Long> lastUpdateIdList = bookInfoCacheManager.getLastUpdateIdList(categoryId);
-        List<BookInfoRespDto> respDtoList = new ArrayList<>();
-        List<Integer> recIdIndexList = new ArrayList<>();
-        int count = 0;
-        Random rand = SecureRandom.getInstanceStrong();
-        while (count < REC_BOOK_COUNT) {
-            int recIdIndex = rand.nextInt(lastUpdateIdList.size());
-            if (!recIdIndexList.contains(recIdIndex)) {
-                recIdIndexList.add(recIdIndex);
-                bookId = lastUpdateIdList.get(recIdIndex);
-                BookInfoRespDto bookInfo = bookInfoCacheManager.getBookInfo(bookId);
-                respDtoList.add(bookInfo);
-                count++;
-            }
-        }
-        return RestResp.ok(respDtoList);
+        // 缓存中的列表不可修改，复制一份再随机打乱
+        List<Long> lastUpdateIdList = new ArrayList<>(
+            bookInfoCacheManager.getLastUpdateIdList(categoryId));
+        Collections.shuffle(lastUpdateIdList, SecureRandom.getInstanceStrong());
+        // 同类小说不足 REC_BOOK_COUNT 本时全部返回
+        return RestResp.ok(lastUpdateIdList.stream()
+            .limit(REC_BOOK_COUNT)
+            .map(bookInfoCacheManager::getBookInfo)
+            .toList());
     }
 
     @Override
@@ -379,7 +371,7 @@ public class BookServiceImpl implements BookService {
         newBookInfo.setLastChapterName(newBookChapter.getChapterName());
         newBookInfo.setLastChapterUpdateTime(LocalDateTime.now());
         newBookInfo.setWordCount(bookInfo.getWordCount() + newBookChapter.getWordCount());
-        newBookChapter.setUpdateTime(LocalDateTime.now());
+        newBookInfo.setUpdateTime(LocalDateTime.now());
         bookInfoMapper.updateById(newBookInfo);
         //  b) 清除小说信息缓存
         bookInfoCacheManager.evictBookInfoCache(dto.getBookId());
